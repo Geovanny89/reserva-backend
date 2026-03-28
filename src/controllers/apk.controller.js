@@ -2,11 +2,11 @@ const { Business } = require('../models');
 const fs = require('fs');
 const path = require('path');
 
-// Ruta de la APK real compilada (se generará con el nombre del negocio)
-const getApkPath = (businessSlug) => path.join(__dirname, `../../uploads/${businessSlug.toLowerCase()}-app.apk`);
+// Ruta de la APK universal (misma para todos los negocios)
+const UNIVERSAL_APK_PATH = path.join(__dirname, '../../uploads/kdice-app.apk');
 
 /**
- * Generar/preparar APK para un negocio específico
+ * Generar/preparar APK universal para cualquier negocio
  */
 exports.generateAPK = async (req, res) => {
   try {
@@ -21,23 +21,22 @@ exports.generateAPK = async (req, res) => {
       return res.status(403).json({ error: 'No tienes permiso para descargar esta APK' });
     }
 
-    const apkPath = getApkPath(businessSlug);
-    const apkExists = fs.existsSync(apkPath);
+    const apkExists = fs.existsSync(UNIVERSAL_APK_PATH);
     const downloadUrl = `/api/apk/download/${businessSlug}/android`;
 
-    console.log(`[APK] Solicitud de APK para negocio: ${businessName} (${businessSlug})`);
-    console.log(`[APK] Ruta del archivo: ${apkPath}`);
-    console.log(`[APK] Existe: ${apkExists}`);
+    console.log(`[APK] Solicitud de APK universal para negocio: ${businessName} (${businessSlug})`);
+    console.log(`[APK] APK universal existe: ${apkExists}`);
 
     res.json({
       success: true,
-      message: apkExists ? 'APK lista para descargar' : 'APK en preparación',
+      message: apkExists ? 'APK universal lista para descargar' : 'APK en preparación',
       downloadUrl,
       businessSlug,
       businessName,
       apkReady: apkExists,
+      universal: true,
       instructions: {
-        android: 'Descarga el APK e instálalo en tu dispositivo Android. Asegúrate de habilitar "Fuentes desconocidas" en Ajustes > Seguridad.',
+        android: 'Descarga el APK universal e instálalo en tu dispositivo Android. La app detectará automáticamente tu negocio.',
         ios: 'Para iOS, contacta a soporte para distribución en App Store o TestFlight.'
       }
     });
@@ -68,7 +67,7 @@ exports.generateIPA = async (req, res) => {
 };
 
 /**
- * Verificar si hay una versión más reciente de la APK
+ * Verificar si hay una versión más reciente de la APK universal
  */
 exports.checkForUpdate = async (req, res) => {
   try {
@@ -79,25 +78,25 @@ exports.checkForUpdate = async (req, res) => {
       return res.status(404).json({ error: 'Negocio no encontrado' });
     }
 
-    const apkPath = getApkPath(slug);
-    const apkExists = fs.existsSync(apkPath);
+    const apkExists = fs.existsSync(UNIVERSAL_APK_PATH);
     
     if (!apkExists) {
       return res.json({
         hasUpdate: false,
-        message: 'No hay APK disponible',
+        message: 'No hay APK universal disponible',
         currentVersion: null,
-        latestVersion: null
+        latestVersion: null,
+        universal: true
       });
     }
 
-    // Obtener información del archivo actual
-    const apkStats = fs.statSync(apkPath);
+    // Obtener información del archivo universal
+    const apkStats = fs.statSync(UNIVERSAL_APK_PATH);
     const currentVersion = {
-      hash: require('crypto').createHash('md5').update(fs.readFileSync(apkPath)).digest('hex'),
+      hash: require('crypto').createHash('md5').update(fs.readFileSync(UNIVERSAL_APK_PATH)).digest('hex'),
       size: apkStats.size,
       lastModified: apkStats.mtime.toISOString(),
-      fileName: `${slug.toLowerCase()}-app.apk`
+      fileName: `kdice-app.apk`
     };
 
     // Simular versión del servidor (en una app real vendría de una BD)
@@ -120,6 +119,7 @@ exports.checkForUpdate = async (req, res) => {
       latestVersion,
       apkExists: true,
       downloadUrl: `/api/apk/download/${slug}/android`,
+      universal: true,
       message: hasUpdate 
         ? 'Hay una nueva versión disponible' 
         : 'Tienes la versión más reciente'
@@ -130,39 +130,36 @@ exports.checkForUpdate = async (req, res) => {
 };
 
 /**
- * Descargar la APK real de KDice
+ * Descargar la APK universal
  * La APK es universal: el usuario ingresa su negocio al hacer login
  */
 exports.downloadAPK = async (req, res) => {
   try {
     const { slug } = req.params;
 
+    // Verificar que el negocio existe
     const business = await Business.findOne({ where: { slug } });
     if (!business) {
       return res.status(404).json({ error: 'Negocio no encontrado' });
     }
 
-    const apkPath = getApkPath(slug);
-    
-    // Verificar que la APK existe y obtener su metadata
-    if (!fs.existsSync(apkPath)) {
+    // Verificar que la APK universal existe
+    if (!fs.existsSync(UNIVERSAL_APK_PATH)) {
       return res.status(404).json({ 
-        error: 'APK no disponible',
-        message: 'La APK para este negocio no está disponible. Contacta a soporte.'
+        error: 'APK universal no disponible',
+        message: 'La APK universal no está disponible. Contacta a soporte.'
       });
     }
 
-    // Obtener información del archivo para control de versiones
-    const apkStats = fs.statSync(apkPath);
-    const fileName = `${slug.toLowerCase()}-app.apk`;
-    const fileHash = require('crypto').createHash('md5').update(fs.readFileSync(apkPath)).digest('hex');
+    // Obtener información del archivo universal
+    const apkStats = fs.statSync(UNIVERSAL_APK_PATH);
+    const fileName = `kdice-app.apk`;
+    const fileHash = require('crypto').createHash('md5').update(fs.readFileSync(UNIVERSAL_APK_PATH)).digest('hex');
     const lastModified = apkStats.mtime.toISOString();
     
-    console.log(`[APK] Descarga de APK para negocio: ${business.name} (${slug})`);
+    console.log(`[APK] Descarga de APK universal para negocio: ${business.name} (${slug})`);
     console.log(`[APK] Archivo: ${fileName}`);
     console.log(`[APK] Tamaño: ${(apkStats.size / 1024 / 1024).toFixed(1)} MB`);
-    console.log(`[APK] Última modificación: ${lastModified}`);
-    console.log(`[APK] Hash: ${fileHash}`);
     
     // Configurar headers para descarga con control de caché
     res.setHeader('Content-Type', 'application/vnd.android.package-archive');
@@ -174,8 +171,8 @@ exports.downloadAPK = async (req, res) => {
     res.setHeader('ETag', `"${fileHash}"`);
     res.setHeader('Last-Modified', lastModified);
     
-    // Stream del archivo
-    const fileStream = fs.createReadStream(apkPath);
+    // Stream del archivo universal
+    const fileStream = fs.createReadStream(UNIVERSAL_APK_PATH);
     fileStream.pipe(res);
     
   } catch (e) {
@@ -194,7 +191,7 @@ exports.downloadIPA = async (req, res) => {
 };
 
 /**
- * Obtener estado de la APK
+ * Obtener estado de la APK universal
  */
 exports.getAPKStatus = async (req, res) => {
   try {
@@ -209,9 +206,8 @@ exports.getAPKStatus = async (req, res) => {
       return res.status(403).json({ error: 'No tienes permiso' });
     }
 
-    const apkPath = getApkPath(business.slug);
-    const apkExists = fs.existsSync(apkPath);
-    const apkStats = apkExists ? fs.statSync(apkPath) : null;
+    const apkExists = fs.existsSync(UNIVERSAL_APK_PATH);
+    const apkStats = apkExists ? fs.statSync(UNIVERSAL_APK_PATH) : null;
 
     res.json({
       businessId,
@@ -222,14 +218,15 @@ exports.getAPKStatus = async (req, res) => {
       apkSize: apkStats ? `${(apkStats.size / 1024 / 1024).toFixed(1)} MB` : null,
       lastGenerated: apkStats ? apkStats.mtime : null,
       apkUrl: `/api/apk/download/${business.slug}/android`,
+      universal: true,
       instructions: {
         android: [
-          '1. Descarga el archivo APK',
+          '1. Descarga el archivo APK universal',
           '2. En tu Android, ve a Ajustes > Seguridad',
           '3. Habilita "Fuentes desconocidas" o "Instalar apps desconocidas"',
           '4. Abre el archivo APK descargado',
           '5. Toca "Instalar" y espera',
-          '6. Abre KDice e inicia sesión con tu cuenta'
+          '6. Abre KDice e ingresa el slug de tu negocio'
         ]
       }
     });
