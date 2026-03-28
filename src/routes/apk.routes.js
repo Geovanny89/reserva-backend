@@ -112,5 +112,7 @@ router.get('/download/:slug/ios', apkController.downloadIPA);
  *         description: Estado del APK
  */
 router.get('/status/:businessId', auth, apkController.getAPKStatus);
+router.get('/check-update/:slug', apkController.checkForUpdate);
+router.get('/download/:slug/android', apkController.downloadAPK);
 
 module.exports = router;
