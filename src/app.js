@@ -12,6 +12,9 @@ app.use(express.urlencoded({ extended: true, limit: '20mb' }));
 // Servir archivos subidos
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
+// Servir archivos estáticos de descargas
+app.use('/downloads', express.static(path.join(__dirname, '../public/downloads')));
+
 // Swagger UI
 const swaggerUi   = require('swagger-ui-express');
 const swaggerSpec = require('./config/swagger');

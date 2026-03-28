@@ -9,7 +9,7 @@ const UNIVERSAL_APK_PATH = path.join(__dirname, '../../uploads/kdice-app.apk');
 const getBusinessApkPath = (businessSlug) => path.join(__dirname, `../../uploads/kdice-${businessSlug}.apk`);
 
 /**
- * Generar/preparar APK personalizada para negocio
+ * Generar/preparar APK universal KDice
  */
 exports.generateAPK = async (req, res) => {
   try {
@@ -24,33 +24,22 @@ exports.generateAPK = async (req, res) => {
       return res.status(403).json({ error: 'No tienes permiso para descargar esta APK' });
     }
 
-    // Verificar si existe APK universal
-    const universalApkExists = fs.existsSync(UNIVERSAL_APK_PATH);
-    const businessApkPath = getBusinessApkPath(businessSlug);
-    const businessApkExists = fs.existsSync(businessApkPath);
-
-    // Si no existe APK del negocio, copiar la universal con nombre personalizado
-    if (!businessApkExists && universalApkExists) {
-      console.log(`[APK] Creando APK personalizada para ${businessSlug}...`);
-      fs.copyFileSync(UNIVERSAL_APK_PATH, businessApkPath);
-    }
-
-    const apkExists = fs.existsSync(businessApkPath);
+    const apkExists = fs.existsSync(UNIVERSAL_APK_PATH);
     const downloadUrl = `/api/apk/download/${businessSlug}/android`;
 
-    console.log(`[APK] Solicitud de APK para negocio: ${businessName} (${businessSlug})`);
-    console.log(`[APK] APK personalizada existe: ${apkExists}`);
+    console.log(`[APK] Solicitud de APK universal KDice para negocio: ${businessName} (${businessSlug})`);
+    console.log(`[APK] APK universal existe: ${apkExists}`);
 
     res.json({
       success: true,
-      message: apkExists ? 'APK lista para descargar' : 'APK en preparación',
+      message: apkExists ? 'APK KDice lista para descargar' : 'APK en preparación',
       downloadUrl,
       businessSlug,
       businessName,
       apkReady: apkExists,
-      personalized: true,
+      universal: true,
       instructions: {
-        android: 'Descarga el APK personalizada e instálala en tu dispositivo Android. La app mostrará el branding de tu negocio.',
+        android: 'Descarga la APK KDice universal e instálala. Al iniciar sesión, ingresa tus credenciales de negocio.',
         ios: 'Para iOS, contacta a soporte para distribución en App Store o TestFlight.'
       }
     });
@@ -144,7 +133,7 @@ exports.checkForUpdate = async (req, res) => {
 };
 
 /**
- * Descargar la APK personalizada del negocio
+ * Descargar la APK universal KDice
  */
 exports.downloadAPK = async (req, res) => {
   try {
@@ -156,28 +145,21 @@ exports.downloadAPK = async (req, res) => {
       return res.status(404).json({ error: 'Negocio no encontrado' });
     }
 
-    // Obtener ruta de APK personalizada
-    const businessApkPath = getBusinessApkPath(slug);
-    
-    // Si no existe APK personalizada, crearla desde la universal
-    if (!fs.existsSync(businessApkPath)) {
-      if (!fs.existsSync(UNIVERSAL_APK_PATH)) {
-        return res.status(404).json({ 
-          error: 'APK no disponible',
-          message: 'No hay APK disponible. Contacta a soporte.'
-        });
-      }
-      console.log(`[APK] Creando APK personalizada para ${slug}...`);
-      fs.copyFileSync(UNIVERSAL_APK_PATH, businessApkPath);
+    // Verificar que la APK universal existe
+    if (!fs.existsSync(UNIVERSAL_APK_PATH)) {
+      return res.status(404).json({ 
+        error: 'APK KDice no disponible',
+        message: 'La APK KDice universal no está disponible. Contacta a soporte.'
+      });
     }
 
-    // Obtener información del archivo personalizado
-    const apkStats = fs.statSync(businessApkPath);
-    const fileName = `kdice-${slug}.apk`;
-    const fileHash = require('crypto').createHash('md5').update(fs.readFileSync(businessApkPath)).digest('hex');
+    // Obtener información del archivo universal
+    const apkStats = fs.statSync(UNIVERSAL_APK_PATH);
+    const fileName = `kdice-app.apk`;
+    const fileHash = require('crypto').createHash('md5').update(fs.readFileSync(UNIVERSAL_APK_PATH)).digest('hex');
     const lastModified = apkStats.mtime.toISOString();
     
-    console.log(`[APK] Descarga de APK personalizada para negocio: ${business.name} (${slug})`);
+    console.log(`[APK] Descarga de APK universal KDice para negocio: ${business.name} (${slug})`);
     console.log(`[APK] Archivo: ${fileName}`);
     console.log(`[APK] Tamaño: ${(apkStats.size / 1024 / 1024).toFixed(1)} MB`);
     
@@ -191,8 +173,8 @@ exports.downloadAPK = async (req, res) => {
     res.setHeader('ETag', `"${fileHash}"`);
     res.setHeader('Last-Modified', lastModified);
     
-    // Stream del archivo personalizado
-    const fileStream = fs.createReadStream(businessApkPath);
+    // Stream del archivo universal
+    const fileStream = fs.createReadStream(UNIVERSAL_APK_PATH);
     fileStream.pipe(res);
     
   } catch (e) {
