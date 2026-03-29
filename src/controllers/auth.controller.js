@@ -44,14 +44,21 @@ exports.registerVendor = async (req, res) => {
       role: 'admin' 
     });
 
-    // Crear el negocio automáticamente
+    // Crear el negocio automáticamente con suscripción de 30 días
+    const now = new Date();
+    const endDate = new Date(now);
+    endDate.setDate(endDate.getDate() + 30);
+    
     const business = await Business.create({
       name: businessName,
       type: businessType,
       description: description || '',
       phone: phone || '',
       address: address || '',
-      ownerId: user.id
+      ownerId: user.id,
+      subscriptionStatus: 'paid',
+      subscriptionStartDate: now,
+      subscriptionEndDate: endDate
     });
 
     // Generar token JWT
@@ -97,10 +104,22 @@ exports.login = async (req, res) => {
       { expiresIn: JWT_EXPIRES }
     );
 
-    // Si es admin, obtener su negocio
+    // Si es admin, obtener su negocio y verificar suscripción
     let business = null;
+    let subscriptionDaysLeft = null;
     if (user.role === 'admin') {
       business = await Business.findOne({ where: { ownerId: user.id } });
+      if (business && business.subscriptionEndDate) {
+        const now = new Date();
+        const endDate = new Date(business.subscriptionEndDate);
+        const diffTime = endDate - now;
+        subscriptionDaysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        
+        // Bloquear si la suscripción venció
+        if (subscriptionDaysLeft <= 0 && business.status !== 'blocked') {
+          await business.update({ status: 'blocked' });
+        }
+      }
     }
 
     // Verificar si el usuario está bloqueado directamente
@@ -138,7 +157,9 @@ exports.login = async (req, res) => {
         name: business.name,
         slug: business.slug,
         type: business.type,
-        status: business.status
+        status: business.status,
+        subscriptionDaysLeft: subscriptionDaysLeft,
+        subscriptionEndDate: business.subscriptionEndDate
       } : null
     });
   } catch (e) {
@@ -153,10 +174,17 @@ exports.me = async (req, res) => {
     });
     if (!user) return res.status(404).json({ error: 'Usuario no encontrado' });
 
-    // Si es admin, obtener su negocio
+    // Si es admin, obtener su negocio y calcular días de suscripción
     let business = null;
+    let subscriptionDaysLeft = null;
     if (user.role === 'admin') {
       business = await Business.findOne({ where: { ownerId: user.id } });
+      if (business && business.subscriptionEndDate) {
+        const now = new Date();
+        const endDate = new Date(business.subscriptionEndDate);
+        const diffTime = endDate - now;
+        subscriptionDaysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      }
     }
 
     res.json({ 
@@ -165,7 +193,11 @@ exports.me = async (req, res) => {
         id: business.id,
         name: business.name,
         slug: business.slug,
-        type: business.type
+        type: business.type,
+        status: business.status,
+        subscriptionStatus: business.subscriptionStatus,
+        subscriptionEndDate: business.subscriptionEndDate,
+        subscriptionDaysLeft: subscriptionDaysLeft
       } : null
     });
   } catch (e) {

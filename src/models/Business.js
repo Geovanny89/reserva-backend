@@ -14,6 +14,8 @@ module.exports = (sequelize) => {
     ownerId:     { type: DataTypes.UUID, allowNull: false },
     status:      { type: DataTypes.ENUM('active', 'blocked'), defaultValue: 'active' },
     subscriptionStatus: { type: DataTypes.ENUM('pending', 'paid', 'overdue'), defaultValue: 'pending' },
+    subscriptionStartDate: { type: DataTypes.DATE },
+    subscriptionEndDate: { type: DataTypes.DATE },
     lastPaymentDate: { type: DataTypes.DATE },
     paymentScreenshot: { type: DataTypes.STRING },
 
